@@ -14,11 +14,12 @@ class Live(object):
         # http://192.168.164.128/live?app=myapp&stream=local
         # http://192.168.164.128:80/live?port=1935&app=myapp&stream=local
         # http://192.168.164.128:80/hls/local.m3u8
-        self.camera_path = 0
-        self.flag = True
+        # self.vedio_path = 0
+        self.vedio_path = "test.mp4"
+        self.flag = False
 
     def setCamera(self):
-        cap = cv2.VideoCapture(self.camera_path)
+        cap = cv2.VideoCapture(self.vedio_path)
         fps = int(cap.get(cv2.CAP_PROP_FPS))
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -38,7 +39,7 @@ class Live(object):
 
     def read_frame(self):
         print("开启推流")
-        cap = cv2.VideoCapture(self.camera_path)
+        cap = cv2.VideoCapture(self.vedio_path)
         # Get video information
         fps = int(cap.get(cv2.CAP_PROP_FPS))
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -60,17 +61,21 @@ class Live(object):
                         self.rtmpUrl]
         # read webcamera
         count = 0
-        while cap.isOpened():
-            ret, frame = cap.read()
-            # cv.imshow(frame)
-            if not ret:
-                print('Opening camera is failed')
-                count += 1
-                cap = cv2.VideoCapture(self.camera_path)
-                if count == 20:
-                    self.flag = False
-            # put frame into queue
-            self.frame_queue.put(frame)
+        while True:
+            if cap.isOpened():
+                ret, frame = cap.read()
+                # cv.imshow(frame)
+                if not ret:
+                    print('Opening camera is failed')
+                    count += 1
+                    cap.release()
+                    cap = cv2.VideoCapture(self.vedio_path)
+                # put frame into queue
+                self.frame_queue.put(frame)
+            else:
+                print('推流已结束')
+                cap.release()
+                cap = cv2.VideoCapture(self.vedio_path)
 
     def push_frame(self):
         # 防止多线程时 command 未被设置
@@ -86,8 +91,10 @@ class Live(object):
                 # process frame
                 # 你处理图片的代码
                 # write to pipe
-                frame = cv2.putText(frame, str(datetime.datetime.now()), (10, 50), font, 1.2, (255, 255, 255), 2)
+                # frame = cv2.putText(frame, str(datetime.datetime.now()), (10, 50), font, 1.2, (255, 255, 255), 2)
                 p.stdin.write(frame.tostring())
+                if self.flag:
+                    break
 
     def run(self):
         threads = [
@@ -97,10 +104,10 @@ class Live(object):
         [thread.setDaemon(True) for thread in threads]
         [thread.start() for thread in threads]
         while True:
-            print("推流中")
-            if self.flag == False:
+            if self.flag:
                 break
 
 
 live = Live()
+# while True:
 live.run()
